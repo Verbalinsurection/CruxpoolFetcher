@@ -2,8 +2,11 @@
 
 """Cruxpool API module"""
 
-from api_request import ApiReq
-from datetime import datetime
+from datetime import datetime, timedelta
+
+import pytz
+
+from .api_request import ApiReq
 
 CAPI_BASE = 'https://www.cruxpool.com/api/{coin}'
 CAPI_ESTIM_EARN = '/estimatedEarnings/{hashrate}'
@@ -22,13 +25,14 @@ def hrate_mh(hashrate):
 
 
 class CruxpoolHelper():
-    def __init__(self, coin, wallet, ref_hrate):
+    def __init__(self, coin, wallet, ref_hrate, pay_amount):
         self.__coin = coin
         self.__wallet = wallet
         self.__ref_hrate = ref_hrate
         self.workers = []
         self.payouts = []
         self.__last_error = None
+        self.__min_payout = pay_amount
 
         self.__capi_base = CAPI_BASE.replace(COIN_TAG, coin)
         self.__capi_estim_earn = \
@@ -45,6 +49,7 @@ class CruxpoolHelper():
         self.__get_estim_earn()
         self.__get_balance()
         self.__get_payout()
+        self.__update_next_payout()
         if self.__last_error is not None:
             return False
         return True
@@ -124,6 +129,32 @@ class CruxpoolHelper():
                 self.__last_error = \
                     '__get_payout -- Can\'t retrieve json result'
 
+    def __update_next_payout(self):
+        to_gain = self.__min_payout - self.__balance
+        minutes_to_tresh = to_gain / self.__coin_min
+
+        self.__next_payout = \
+            datetime.utcnow() + \
+            timedelta(minutes=minutes_to_tresh)
+        self.__next_payout = self.__next_payout.replace(tzinfo=pytz.UTC)
+
+        time_diff_next = self.__next_payout - datetime.now().astimezone()
+
+        self.__unpaid_at_next = round(
+            (time_diff_next.total_seconds() *
+             (self.__coin_min / 60) + self.__balance), 5)
+
+        self.__next_payout_txt = \
+            self.__next_payout.strftime(DATE_FORMAT)
+
+    @property
+    def wallet(self):
+        return self.__wallet
+
+    @property
+    def pool_name(self):
+        return 'Cruxpool'
+
     @property
     def hrate_reported(self):
         return self.__hrate_reported
@@ -131,6 +162,10 @@ class CruxpoolHelper():
     @property
     def hrate_current(self):
         return self.__hrate_current
+
+    @property
+    def hrate_ref(self):
+        return self.__ref_hrate
 
     @property
     def hrate_3h(self):
@@ -175,6 +210,38 @@ class CruxpoolHelper():
     @property
     def balance(self):
         return self.__balance
+
+    @property
+    def next_payout(self):
+        return self.__next_payout
+
+    @property
+    def unpaid_at_next(self):
+        return self.__unpaid_at_next
+
+    @property
+    def valid_shares(self):
+        shares = 0
+        for worker in self.workers:
+            shares = shares + worker.shares
+
+        return shares
+
+    @property
+    def stale_shares(self):
+        shares = 0
+        for worker in self.workers:
+            shares = shares + worker.stale_shares
+
+        return shares
+
+    @property
+    def invalid_shares(self):
+        shares = 0
+        for worker in self.workers:
+            shares = shares + worker.invalid_shares
+
+        return shares
 
 
 class Worker():

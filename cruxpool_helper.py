@@ -13,6 +13,7 @@ CAPI_ESTIM_EARN = '/estimatedEarnings/{hashrate}'
 CAPI_MINER = '/miner/{minerId}'
 CAPI_BALANCE = '/balance'
 CAPI_PAYMENTS = '/payments'
+CAPI_HISTORY = '/history/month'
 
 DATE_FORMAT = '%Y-%m-%d %H:%M'
 COIN_TAG = '{coin}'
@@ -31,6 +32,7 @@ class CruxpoolHelper():
         self.__ref_hrate = ref_hrate
         self.workers = []
         self.payouts = []
+        self.history = []
         self.__last_error = None
         self.__min_payout = pay_amount
 
@@ -42,6 +44,7 @@ class CruxpoolHelper():
             self.__capi_base + CAPI_MINER.replace(MINER_TAG, wallet)
         self.__capi_balance = self.__capi_miner + CAPI_BALANCE
         self.__capi_payments = self.__capi_miner + CAPI_PAYMENTS
+        self.__capi_history = self.__capi_miner + CAPI_HISTORY
 
     def update(self):
         self.__last_error = None
@@ -50,6 +53,7 @@ class CruxpoolHelper():
         self.__get_balance()
         self.__get_payout()
         self.__update_next_payout()
+        self.__update_history()
         if self.__last_error is not None:
             return False
         return True
@@ -146,6 +150,22 @@ class CruxpoolHelper():
 
         self.__next_payout_txt = \
             self.__next_payout.strftime(DATE_FORMAT)
+
+    def __update_history(self):
+        api = ApiReq()
+        miner_json = api.api_request(self.__capi_history)
+        self.__last_error = api.last_error
+        if miner_json is not None and api.last_error is None:
+            try:
+                data_json = miner_json['data']
+                for history in data_json['history']:
+                    self.history.append(History(history))
+            except KeyError as e:
+                self.__last_error = '__update_history: ' + str(e)
+        else:
+            if self.__last_error is None:
+                self.__last_error = \
+                    '__update_history -- Can\'t retrieve json result'
 
     @property
     def wallet(self):
@@ -300,3 +320,10 @@ class Payout():
         self.paid_on_txt = self.paid_on.strftime(DATE_FORMAT)
         self.amount = round(json_data['amount'] / 10e7, 5)
         self.tx = json_data['tx']
+
+
+class History():
+    def __init__(self, json_data):
+        self.h_date = datetime.utcfromtimestamp(
+            json_data['timestamp'])
+        self.amount = round(json_data['amount'] / 10e7, 5)

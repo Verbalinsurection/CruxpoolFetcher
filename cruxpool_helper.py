@@ -135,7 +135,10 @@ class CruxpoolHelper():
 
     def __update_next_payout(self):
         to_gain = self.__min_payout - self.__balance
-        minutes_to_tresh = to_gain / self.__coin_min
+        if self.__coin_min > 0:
+            minutes_to_tresh = to_gain / self.__coin_min
+        else:
+            minutes_to_tresh = 0
 
         self.__next_payout = \
             datetime.utcnow() + \

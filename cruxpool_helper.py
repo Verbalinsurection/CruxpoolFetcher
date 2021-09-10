@@ -70,6 +70,8 @@ class CruxpoolHelper():
                 self.__hrate_3h = hrate_mh(data_json['hashrate'])
                 self.__hrate_day = hrate_mh(data_json['avgHashrate'])
                 self.__coin_min = data_json['coinPerMins']
+                if self.__coin_min == 0:
+                    self.__coin_min = 0.0
                 self.workers.clear()
                 for json_worker in data_json['workers']:
                     worker = Worker(json_worker,

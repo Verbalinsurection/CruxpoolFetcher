@@ -163,7 +163,7 @@ class CruxpoolHelper():
         if miner_json is not None and api.last_error is None:
             try:
                 data_json = miner_json['data']
-                if data_json is None:
+                if data_json['history'] is None:
                     return
                 for history in data_json['history']:
                     self.history.append(History(history))
